@@ -65,7 +65,8 @@ android {
 
 dependencies {
 
-    implementation 'com.github.horizontalsystems:hd-wallet-kit-android:a74b51f'
+//    implementation 'com.github.horizontalsystems:hd-wallet-kit-android:a74b51f'
+    implementation 'com.github.xiaoyu604:hd-wallet-kit-android:1.0.1'
 
     implementation 'org.bouncycastle:bcpkix-jdk15on:1.70'
 
