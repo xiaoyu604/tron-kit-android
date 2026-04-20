@@ -7,10 +7,12 @@ import io.horizontalsystems.tronkit.models.Contract
 import io.horizontalsystems.tronkit.models.TransferAssetContract
 import io.horizontalsystems.tronkit.models.TransferContract
 import io.horizontalsystems.tronkit.models.TriggerSmartContract
-import io.horizontalsystems.tronkit.network.TronGridService
+import io.horizontalsystems.tronkit.network.INodeApiProvider
+import io.horizontalsystems.tronkit.network.IRpcApiProvider
+import io.horizontalsystems.tronkit.rpc.EstimateGasJsonRpc
 import io.horizontalsystems.tronkit.sync.ChainParameterManager
-import org.tron.protos.Protocol.Transaction
 import java.math.BigInteger
+import org.tron.protos.Protocol.Transaction
 
 
 sealed class Fee {
@@ -38,21 +40,16 @@ sealed class Fee {
 
 }
 
-// curl -X POST  https://nile.trongrid.io/wallet/getaccountresource -d '{"address" : "TNeQ7jLVzXUB9kXVurzN9ZQibLaykov5v2" }'
-
 class FeeProvider(
-    private val tronGridService: TronGridService,
+    private val nodeApiProvider: INodeApiProvider,
+    private val rpcApiProvider: IRpcApiProvider,
     private val chainParameterManager: ChainParameterManager
 ) {
 
     private val MAX_RESULT_SIZE_IN_TX: Long = 64
 
-    suspend fun isAccountActive(address: Address) = try {
-        tronGridService.getAccountInfo(address.base58)
-        true
-    } catch (error: TronGridService.TronGridServiceError.NoAccountInfoData) {
-        false
-    }
+    suspend fun isAccountActive(address: Address) =
+        nodeApiProvider.fetchAccount(address.hex) != null
 
     private fun feesAccountActivation(): List<Fee> {
         return listOf(
@@ -99,11 +96,15 @@ class FeeProvider(
             }
 
             is TriggerSmartContract -> {
-                val energyRequired = tronGridService.estimateEnergy(
-                    ownerAddress = "0x${contract.ownerAddress.hex}",
-                    contractAddress = "0x${contract.contractAddress.hex}",
-                    value = contract.callValue ?: BigInteger.ZERO,
-                    data = "0x${contract.data}"
+                val energyRequired = rpcApiProvider.fetch(
+                    EstimateGasJsonRpc(
+                        from = "0x${contract.ownerAddress.hex}",
+                        to = "0x${contract.contractAddress.hex}",
+                        amount = contract.callValue ?: BigInteger.ZERO,
+                        gasLimit = 0L,
+                        gasPrice = 0L,
+                        data = "0x${contract.data}"
+                    )
                 )
                 val feeEnergy = Fee.Energy(required = energyRequired, price = chainParameterManager.energyFee)
                 fees.add(feeEnergy)

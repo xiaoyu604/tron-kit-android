@@ -8,7 +8,6 @@ import io.horizontalsystems.tronkit.models.LastBlockHeight
 import io.horizontalsystems.tronkit.models.Transaction
 import io.horizontalsystems.tronkit.models.TransactionSyncState
 import io.horizontalsystems.tronkit.models.TransactionTag
-import io.horizontalsystems.tronkit.models.Trc20Balance
 import io.horizontalsystems.tronkit.models.Trc20EventRecord
 import java.math.BigInteger
 
@@ -27,13 +26,21 @@ class Storage(
         return database.balanceDao().getBalance(trxBalanceId())?.balance
     }
 
-    fun saveBalances(trxBalance: BigInteger, balances: List<Trc20Balance>) {
-        database.runInTransaction {
-            database.balanceDao().deleteAll()
+    fun saveTrxBalance(balance: BigInteger) {
+        database.balanceDao().insert(Balance(trxBalanceId(), balance))
+    }
 
-            database.balanceDao().insert(Balance(trxBalanceId(), trxBalance))
-            database.balanceDao().insert(balances.map { (contractAddress, balance) -> Balance(trc20BalanceId(contractAddress), balance) })
-        }
+    fun saveTrc20Balance(balance: BigInteger, contractAddress: String) {
+        database.balanceDao().insert(Balance(trc20BalanceId(contractAddress), balance))
+    }
+
+    fun clearTrc20Balances() {
+        database.balanceDao().deleteTrc20Balances()
+    }
+
+    fun allTrc20Addresses(): List<String> {
+        return database.balanceDao().getTrc20Ids()
+            .map { it.removePrefix("TRC20|") }
     }
 
     fun getTrc20Balance(contractAddress: String): BigInteger? {
@@ -67,6 +74,10 @@ class Storage(
 
     fun getTransactions(): List<Transaction> {
         return database.transactionDao().getTransactions()
+    }
+
+    fun getTransactionHashes(): List<ByteArray> {
+        return database.transactionDao().getTransactionHashes()
     }
 
     suspend fun getPendingTransactions(tags: List<List<String>>): List<Transaction> {
